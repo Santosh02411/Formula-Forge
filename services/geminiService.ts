@@ -1,12 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import type { ImageData } from '../types';
 
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const SYSTEM_INSTRUCTION = `You are 'Formula Forge', an advanced AI expert in mathematics, science, and logical reasoning. 
 Your task is to provide highly accurate, detailed, and step-by-step solutions to the problems presented. 
 Format your response using Markdown. Use code blocks for equations and formulas during the step-by-step explanation.
@@ -15,6 +9,11 @@ Ensure your final answer is clearly stated and highlighted. For the final answer
 
 export const solveProblem = async (text: string, image?: ImageData | null): Promise<string> => {
   try {
+    if (!process.env.API_KEY) {
+      return "⚠️ No Gemini API key found. Create a `.env.local` file in the project root with `GEMINI_API_KEY=your_api_key_here`, then restart `npm run dev`.";
+    }
+
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const contents = [];
 
     if (image) {

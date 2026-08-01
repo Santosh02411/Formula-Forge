@@ -27,15 +27,12 @@ const App: React.FC = () => {
     setImageData(null);
     setError(null);
   };
-
   const handleSolve = async () => {
     setSolution(null);
     setError(null);
     setIsLoading(true);
-
     let currentImageData: ImageData | null = null;
     let currentText = problemText;
-
     if (activeMode === InputMode.IMAGE) {
       if (!imageData) {
         setError("Please upload an image first.");
