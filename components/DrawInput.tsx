@@ -14,11 +14,11 @@ const DrawInput = forwardRef<DrawInputHandles, {}>((props, ref) => {
     getCanvasData,
   }));
   
-  const colors = ['#FFFFFF', '#FF3B30', '#4A90E2', '#34C759', '#FFCC00'];
+  const colors = ['#f2ede4', '#ff7a3d', '#d4a73d', '#7fa84f', '#d9573f'];
 
   return (
-    <div className="w-full flex flex-col items-center space-y-4">
-        <div className="w-full h-72 bg-brand-secondary rounded-lg overflow-hidden border-2 border-brand-accent/30">
+    <div className="w-full flex flex-col items-center space-y-3">
+        <div className="w-full h-72 bg-forge-void rounded-xl overflow-hidden border border-forge-border">
             <canvas
                 ref={canvasRef}
                 onMouseDown={startDrawing}
@@ -31,9 +31,9 @@ const DrawInput = forwardRef<DrawInputHandles, {}>((props, ref) => {
                 className="w-full h-full cursor-crosshair"
             />
         </div>
-      <div className="flex items-center justify-between w-full p-2 bg-brand-secondary rounded-lg">
+      <div className="flex flex-wrap items-center justify-between gap-3 w-full p-3 bg-forge-surface-2 rounded-xl border border-forge-border">
         <div className="flex items-center space-x-2">
-            <label htmlFor="brush-size" className="text-sm font-medium text-brand-muted">Size:</label>
+            <label htmlFor="brush-size" className="text-xs font-medium text-forge-muted">Size</label>
             <input
                 id="brush-size"
                 type="range"
@@ -41,7 +41,7 @@ const DrawInput = forwardRef<DrawInputHandles, {}>((props, ref) => {
                 max="20"
                 value={lineWidth}
                 onChange={(e) => setLineWidth(Number(e.target.value))}
-                className="w-24 h-2 bg-brand-primary rounded-lg appearance-none cursor-pointer accent-brand-accent"
+                className="w-24 h-1.5 bg-forge-border rounded-lg appearance-none cursor-pointer accent-forge-ember"
             />
         </div>
         <div className="flex items-center space-x-2">
@@ -49,13 +49,14 @@ const DrawInput = forwardRef<DrawInputHandles, {}>((props, ref) => {
             <button
               key={c}
               onClick={() => setColor(c)}
-              className={`w-6 h-6 rounded-full transition-transform transform hover:scale-110 ${color === c ? 'ring-2 ring-offset-2 ring-offset-brand-secondary ring-white' : ''}`}
+              aria-label={`Select color ${c}`}
+              className={`w-6 h-6 rounded-full transition-transform duration-150 hover:scale-110 ${color === c ? 'ring-2 ring-offset-2 ring-offset-forge-surface-2 ring-forge-ember' : ''}`}
               style={{ backgroundColor: c }}
             />
           ))}
         </div>
-        <button onClick={clearCanvas} className="px-3 py-1.5 bg-red-500 text-white text-sm font-semibold rounded-md hover:bg-red-600 transition-colors flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <button onClick={clearCanvas} className="px-3 py-1.5 bg-forge-danger text-white text-xs font-semibold rounded-md hover:brightness-110 transition-all flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
             Clear

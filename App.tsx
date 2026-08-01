@@ -82,40 +82,43 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-brand-primary text-brand-light">
+    <div className="min-h-screen">
       <Header />
       <main className="container mx-auto max-w-4xl p-4 md:p-8">
-        <div className="bg-brand-secondary/50 p-6 rounded-xl shadow-2xl border border-brand-accent/20">
+        <div className="animate-fade-up bg-forge-surface/60 p-5 md:p-7 rounded-2xl shadow-2xl border border-forge-border">
           <InputTabs activeMode={activeMode} onModeChange={handleModeChange} />
           
-          <div className="mt-4">
+          <div className="mt-5">
             {/* Additional text input for image and draw modes */}
             {(activeMode === InputMode.IMAGE || activeMode === InputMode.DRAW) && (
-              <TextInput 
-                problemText={problemText} 
-                setProblemText={setProblemText}
-              />
+              <div className="mb-4">
+                <TextInput 
+                  problemText={problemText} 
+                  setProblemText={setProblemText}
+                />
+              </div>
             )}
-            <div className="mt-4">
-              {renderInputComponent()}
-            </div>
+            {renderInputComponent()}
           </div>
           
-          {error && <p className="mt-4 text-center text-red-400">{error}</p>}
+          {error && (
+            <p className="mt-4 text-center text-sm text-forge-danger bg-forge-danger/10 border border-forge-danger/30 rounded-lg py-2 px-4">
+              {error}
+            </p>
+          )}
 
           <div className="mt-6 flex justify-center">
             <button
               onClick={handleSolve}
               disabled={isLoading}
-              className="px-8 py-3 bg-brand-accent text-white font-bold rounded-lg shadow-lg hover:bg-blue-500 transition-all duration-300 transform hover:scale-105 disabled:bg-gray-500 disabled:cursor-not-allowed disabled:scale-100 flex items-center"
+              className="px-8 py-3 bg-gradient-to-b from-forge-ember to-forge-ember-deep text-white font-display font-semibold rounded-xl shadow-ember hover:shadow-ember-lg transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none flex items-center"
             >
                 {isLoading ? (
                     <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Solving...
+                        <span className="forge-loader forge-loader--light mr-3 scale-75">
+                          <span></span><span></span><span></span>
+                        </span>
+                        Solving…
                     </>
                 ) : (
                     'Solve with Gemini'
@@ -125,6 +128,10 @@ const App: React.FC = () => {
         </div>
 
         <SolutionDisplay solution={solution} isLoading={isLoading} />
+
+        <footer className="text-center text-xs text-forge-muted/70 mt-8 pb-4">
+          Powered by Google Gemini
+        </footer>
       </main>
     </div>
   );

@@ -1,24 +1,64 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Formula Forge</title>
+    <meta name="theme-color" content="#141311" />
+    <title>Formula Forge — Solve step by step</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              'brand-primary': '#0D0D2B',
-              'brand-secondary': '#1E1E3F',
-              'brand-accent': '#4A90E2',
-              'brand-light': '#F5F5F5',
-              'brand-muted': '#A9A9A9',
+              'forge-void': 'var(--bg-void)',
+              'forge-surface': 'var(--bg-surface)',
+              'forge-surface-2': 'var(--bg-surface-2)',
+              'forge-border': 'var(--border-subtle)',
+              'forge-border-strong': 'var(--border-strong)',
+              'forge-ink': 'var(--ink)',
+              'forge-muted': 'var(--ink-muted)',
+              'forge-ember': 'var(--ember)',
+              'forge-ember-deep': 'var(--ember-deep)',
+              'forge-brass': 'var(--brass)',
+              'forge-success': 'var(--success)',
+              'forge-danger': 'var(--danger)',
+              /* legacy aliases so existing brand-* usage still themes correctly */
+              'brand-primary': 'var(--bg-void)',
+              'brand-secondary': 'var(--bg-surface)',
+              'brand-accent': 'var(--ember)',
+              'brand-light': 'var(--ink)',
+              'brand-muted': 'var(--ink-muted)',
             },
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
+              display: ['"Space Grotesk"', 'sans-serif'],
+              mono: ['"IBM Plex Mono"', 'monospace'],
+            },
+            boxShadow: {
+              'ember': '0 0 0 1px rgba(255,122,61,0.4), 0 8px 24px -8px rgba(255,122,61,0.45)',
+              'ember-lg': '0 0 0 1px rgba(255,122,61,0.35), 0 16px 40px -12px rgba(255,122,61,0.5)',
+            },
+            keyframes: {
+              'fade-up': {
+                '0%': { opacity: '0', transform: 'translateY(14px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              'flicker': {
+                '0%, 100%': { opacity: '1' },
+                '50%': { opacity: '0.75' },
+              },
+              'ember-rise': {
+                '0%': { transform: 'translateY(0) translateX(0)', opacity: '0' },
+                '10%': { opacity: '1' },
+                '100%': { transform: 'translateY(-60px) translateX(6px)', opacity: '0' },
+              },
+            },
+            animation: {
+              'fade-up': 'fade-up 0.5s ease-out both',
+              'flicker': 'flicker 2.4s ease-in-out infinite',
+              'ember-rise': 'ember-rise 3.2s ease-in infinite',
             },
           },
         },
@@ -26,7 +66,7 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script type="importmap">
 {
   "imports": {
@@ -39,7 +79,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-brand-primary text-brand-light font-sans">
+  <body class="bg-forge-void text-forge-ink font-sans">
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

@@ -6,9 +6,12 @@ interface Point {
   y: number;
 }
 
+const getCanvasBgColor = () =>
+  getComputedStyle(document.documentElement).getPropertyValue('--bg-void').trim() || '#141311';
+
 export const useDrawingCanvas = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
   const [isDrawing, setIsDrawing] = useState(false);
-  const [color, setColor] = useState('#FFFFFF');
+  const [color, setColor] = useState('#f2ede4');
   const [lineWidth, setLineWidth] = useState(5);
   const lastPosition = useRef<Point | null>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -28,17 +31,22 @@ export const useDrawingCanvas = (canvasRef: React.RefObject<HTMLCanvasElement>) 
           if (container) {
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
-            // Redraw background
-            ctx.fillStyle = '#1E1E3F';
+            // Redraw background using the current theme's surface color
+            ctx.fillStyle = getCanvasBgColor();
             ctx.fillRect(0, 0, canvas.width, canvas.height);
           }
         };
 
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
+
+        // Re-fill background if the theme changes while the canvas is empty
+        const themeObserver = new MutationObserver(resizeCanvas);
+        themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
         
         return () => {
           window.removeEventListener('resize', resizeCanvas);
+          themeObserver.disconnect();
         };
       }
     }
@@ -92,7 +100,7 @@ export const useDrawingCanvas = (canvasRef: React.RefObject<HTMLCanvasElement>) 
       const canvas = canvasRef.current;
       const ctx = contextRef.current;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#1E1E3F'; // Background color
+      ctx.fillStyle = getCanvasBgColor();
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
   }, [canvasRef]);

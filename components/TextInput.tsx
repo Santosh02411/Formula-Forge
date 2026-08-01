@@ -12,8 +12,8 @@ const TextInput: React.FC<TextInputProps> = ({ problemText, setProblemText }) =>
       <textarea
         value={problemText}
         onChange={(e) => setProblemText(e.target.value)}
-        placeholder="Type your math, science, or logic problem here... For example: 'What is the integral of x^2 dx from 0 to 1?'"
-        className="w-full h-48 p-4 bg-brand-secondary border-2 border-brand-accent/30 rounded-lg text-brand-light placeholder-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-accent transition-all duration-200 resize-none"
+        placeholder="Type your math, science, or engineering problem here… e.g. 'What is the integral of x^2 dx from 0 to 1?'"
+        className="w-full h-48 p-4 bg-forge-void border border-forge-border rounded-xl text-forge-ink placeholder-forge-muted/70 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-forge-ember focus:border-forge-ember/50 transition-all duration-200 resize-none"
       />
     </div>
   );
