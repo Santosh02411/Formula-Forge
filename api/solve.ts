@@ -11,6 +11,7 @@ const MODES: Record<string, string> = {
   check: `The student has shared THEIR OWN attempt (image and/or text). Review it line by line: say what is correct, find the FIRST mistake, explain why it is wrong, and show the corrected next step. Be encouraging. Do not rewrite the entire solution unless the attempt is empty. End with a verdict: Correct / Partly correct / Incorrect.`,
   practice: `Create ONE new practice problem testing the same concept, with different numbers/context and similar difficulty. Do NOT solve it in the main text. After a --- separator add "**Answer (for self-check):**" with only the final answer.`,
   transcribe: `Transcribe the handwritten or printed problem in the image EXACTLY as written, as plain text. Use ^ for powers, / for fractions, sqrt() for roots, and keep every digit, sign, variable and unit. Do not solve it, explain, or add anything. If part is illegible write [unclear]. Output only the transcription.`,
+  quiz: `Create exactly 3 multiple-choice questions (4 options each) that test the key concept from the given problem and tutor reply, with increasing difficulty. Output ONLY a JSON array: [{"q":"question","options":["A","B","C","D"],"answer":0,"why":"one-sentence explanation"}] where answer is the 0-based index of the correct option. Plain text only, no LaTeX.`,
   followup: `Answer the student's follow-up question using the provided context. Be concise and clear, and relate it back to the earlier steps.`,
 };
 
@@ -34,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY is not set on the server.' });
 
-  const { text = '', image = null, mode = 'solve', level = 'standard', subject = 'auto' } = (req.body || {}) as any;
+  const { text = '', image = null, mode = 'solve', level = 'standard', subject = 'auto', language = 'English' } = (req.body || {}) as any;
 
   if (typeof text !== 'string' || text.length > 12000) return res.status(400).json({ error: 'Text is too long (max 12,000 characters).' });
   if (image && (!MIME_OK.includes(image.mimeType) || typeof image.base64 !== 'string' || image.base64.length > 4_000_000)) {
@@ -43,9 +44,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!text.trim() && !image) return res.status(400).json({ error: 'Please provide a problem as text or an image.' });
 
   const subjectLine = subject && subject !== 'auto' ? `Subject area: ${subject}.` : '';
+  const langLine = language && language !== 'English' ? `Write all explanations in ${language} (keep numbers, formulas, variables and symbols as they are).` : '';
   const authority = image && text.trim() && (mode === 'solve' || mode === 'hint')
     ? 'The typed text is the student-verified transcription of the problem; trust it over the image wherever they differ, and use the image only for diagrams.' : '';
-  const systemInstruction = mode === 'transcribe' ? MODES.transcribe : [BASE, MODES[mode] || MODES.solve, LEVELS[level] || LEVELS.standard, subjectLine, authority].filter(Boolean).join('\n\n');
+  const systemInstruction = mode === 'transcribe' ? MODES.transcribe : mode === 'quiz' ? [MODES.quiz, langLine].filter(Boolean).join('\n\n') : [BASE, MODES[mode] || MODES.solve, LEVELS[level] || LEVELS.standard, subjectLine, langLine, authority].filter(Boolean).join('\n\n');
 
   const parts: any[] = [];
   if (image) parts.push({ inlineData: { mimeType: image.mimeType, data: image.base64 } });
@@ -55,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let lastError = 'Unknown error';
   for (const model of MODELS) {
     try {
-      const response = await ai.models.generateContent({ model, contents: { parts }, config: { systemInstruction } });
+      const response = await ai.models.generateContent({ model, contents: { parts }, config: { systemInstruction, ...(mode === 'quiz' ? { responseMimeType: 'application/json' } : {}) } });
       if (response.text) return res.status(200).json({ text: response.text });
       lastError = 'The model returned an empty response. Try rephrasing or a clearer image.';
     } catch (e) {
