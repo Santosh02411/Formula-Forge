@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { QuizQuestion } from '../types';
 
-const QuizCard: React.FC<{ questions: QuizQuestion[]; onClose: () => void }> = ({ questions, onClose }) => {
+const QuizCard: React.FC<{ questions: QuizQuestion[]; onClose: () => void; onFinish: (r: { topic: string; correct: boolean }[]) => void }> = ({ questions, onClose, onFinish }) => {
   const [sel, setSel] = useState<(number | null)[]>(questions.map(() => null));
   const score = sel.filter((s, i) => s === questions[i].answer).length;
   const done = sel.every((s) => s !== null);
+  const reported = useRef(false);
+  useEffect(() => {
+    if (done && !reported.current) { reported.current = true; onFinish(questions.map((q, i) => ({ topic: q.topic || 'General', correct: sel[i] === q.answer }))); }
+  }, [done]);
   return (
     <div className="w-full mt-6 p-6 bg-forge-surface border border-forge-border rounded-2xl print:hidden">
       <div className="flex justify-between items-center mb-4">

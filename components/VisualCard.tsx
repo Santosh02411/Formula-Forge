@@ -71,6 +71,7 @@ export const VisualCard: React.FC<{ spec: any; onClose: () => void }> = ({ spec,
         <p className="font-display font-semibold text-forge-ink">Visual explanation{spec.title ? `: ${spec.title}` : ''}</p>
         <button onClick={onClose} className="text-xs text-forge-muted hover:text-forge-ember">Close</button>
       </div>
+      {spec.note && <p className="text-sm text-forge-ink mb-3">{spec.note}</p>}
       {spec.type === 'plot' ? <PlotView spec={spec} /> : svg ? <div className="text-forge-ink [&>svg]:w-full [&>svg]:h-auto" dangerouslySetInnerHTML={{ __html: svg }} /> : <p className="text-sm text-forge-muted">Could not draw this diagram. Try again.</p>}
       {spec.type === 'svg' && <p className="text-xs text-forge-muted mt-2">AI-generated diagram — check labels against the problem.</p>}
     </div>

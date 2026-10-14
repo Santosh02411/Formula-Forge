@@ -38,7 +38,7 @@ const Loader = () => (
 
 const btn = 'px-3 py-1.5 text-xs font-medium rounded-lg border border-forge-border text-forge-muted hover:text-forge-ember hover:border-forge-ember/50 transition-all';
 
-const SolutionDisplay: React.FC<Props> = ({ thread, isLoading, onFollowUp, onPractice, onQuiz, quizLoading, language, onVisual, visualLoading, onVerify, verifyLoading }) => {
+const SolutionDisplay: React.FC<Props> = ({ thread, isLoading, onFollowUp, onPractice, onQuiz, quizLoading, language, onVisual, visualLoading, onVerify, verifyLoading, verifyStatus, onWhatIf, whatIfLoading }) => {
   const [q, setQ] = useState('');
   const [copied, setCopied] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -71,6 +71,11 @@ const SolutionDisplay: React.FC<Props> = ({ thread, isLoading, onFollowUp, onPra
       )}
       {thread.map((t, i) => (
         <section key={i} className={i > 0 ? 'mt-6 pt-6 border-t border-forge-border' : ''}>
+          {i === 0 && t.label === 'Solution' && (
+            <p className={`inline-block text-xs px-2 py-1 mb-2 rounded-md border ${verifyStatus === 'verified' ? 'border-green-500 text-green-500' : verifyStatus === 'mismatch' ? 'border-forge-danger text-forge-danger' : 'border-forge-border text-forge-muted'}`}>
+              {verifyStatus === 'verified' ? '✅ Final answer independently verified' : verifyStatus === 'mismatch' ? '⚠️ Independent check disagreed — review carefully' : 'AI-generated explanation · not independently verified (tap ✅ Verify answer)'}
+            </p>
+          )}
           <p className="text-xs uppercase tracking-wider text-forge-brass mb-2">{t.label}</p>
           <div className="forge-prose w-full max-w-none animate-fade-up" dangerouslySetInnerHTML={{ __html: toSafeHtml(t.text) }} />
         </section>
@@ -93,6 +98,7 @@ const SolutionDisplay: React.FC<Props> = ({ thread, isLoading, onFollowUp, onPra
               placeholder="Ask a follow-up, e.g. “Why did we use this formula?”"
               className="flex-1 px-3 py-2 bg-forge-void border border-forge-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-forge-ember" />
             <button onClick={submit} className="px-4 py-2 rounded-lg bg-forge-ember text-white text-sm font-semibold disabled:opacity-50" disabled={!q.trim()}>Ask</button>
+            <button onClick={() => { if (q.trim() && !whatIfLoading) { onWhatIf(q.trim()); setQ(''); } }} className="px-3 py-2 rounded-lg border border-forge-border text-forge-ink text-sm hover:border-forge-ember/60 disabled:opacity-50" disabled={!q.trim() || whatIfLoading} title="Type a what-if, e.g. What if gravity were half?">{whatIfLoading ? '…' : '🧪 What if'}</button>
           </div>
         </div>
       )}
