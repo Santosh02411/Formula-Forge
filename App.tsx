@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Header from './components/Header';
 import InputTabs from './components/InputTabs';
 import TextInput from './components/TextInput';
@@ -11,6 +11,10 @@ import HistoryPanel from './components/HistoryPanel';
 import MicButton from './components/MicButton';
 import { VisualCard, VerifyBadge } from './components/VisualCard';
 import { verifyClaim } from './utils/mathExpr';
+import ProgressPanel from './components/ProgressPanel';
+import { loadMastery, saveMastery, levelFor } from './utils/mastery';
+import type { Mastery } from './utils/mastery';
+import { speak, stopSpeaking, speechLang } from './utils/speech';
 import type { VerifyResult } from './utils/mathExpr';
 import { loadHistory, saveHistory, loadSolved, saveSolved } from './utils/history';
 import { solveProblem } from './services/geminiService';
@@ -36,6 +40,9 @@ const App: React.FC = () => {
   const [visualLoading, setVisualLoading] = useState(false);
   const [verifyRes, setVerifyRes] = useState<VerifyResult | null>(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
+  const [mastery, setMastery] = useState<Mastery>(loadMastery);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [whatIfLoading, setWhatIfLoading] = useState(false);
   const histId = useRef('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,12 +56,12 @@ const App: React.FC = () => {
     setImageData(null);
     setError(null);
   };
-  const run = async (label: string, text: string, image: ImageData | null, mode: SolveOptions['mode'], append = false) => {
+  const run = async (label: string, text: string, image: ImageData | null, mode: SolveOptions['mode'], append = false, lv: Level = level) => {
     setError(null);
     setIsLoading(true);
     if (!append) setThread([]);
     try {
-      const result = await solveProblem(text, image, { mode, level, subject, language });
+      const result = await solveProblem(text, image, { mode, level: lv, subject, language });
       const next = [...(append ? thread : []), { label, text: result }];
       setThread(next);
       setQuiz(null);
@@ -78,6 +85,7 @@ const App: React.FC = () => {
     try {
       const t = (await solveProblem('', image, { mode: 'transcribe', level, subject, language })).trim();
       setProblemText(t);
+      if (t.includes('[unclear]')) setError('Some handwriting was unclear, so please check and correct the text above, then press Solve.');
       return t;
     } catch (e: any) {
       setError(e.message || 'Could not read the drawing.');
@@ -107,7 +115,7 @@ const App: React.FC = () => {
     let text = problemText;
     if (activeMode === InputMode.DRAW && image && !text.trim() && action !== 'check') {
       text = await readDrawing(image);
-      if (!text) return;
+      if (!text || text.includes('[unclear]')) return;
     }
     setLastProblem(text.trim() || '(problem is in the image the student provided)');
     const label = action === 'hint' ? 'Hints' : action === 'check' ? 'Feedback on your work' : 'Solution';
@@ -149,6 +157,37 @@ const App: React.FC = () => {
     } catch { setError('Could not run the verification this time. Please try again.'); }
     finally { setVerifyLoading(false); }
   };
+  const handleWhatIf = async (q: string) => {
+    setWhatIfLoading(true); setError(null);
+    try {
+      const r = parseJson(await solveProblem(`${solutionContext()}\n\nWhat-if question: ${q}`, null, { mode: 'whatif', level, subject, language }));
+      if (r?.plot?.type !== 'plot') throw new Error('bad');
+      setVisual({ ...r.plot, title: `What if: ${q}`.slice(0, 80), note: r.prediction });
+    } catch { setError('Could not run that what-if this time. Try rephrasing it.'); }
+    finally { setWhatIfLoading(false); }
+  };
+  const handleQuizFinish = (rs: { topic: string; correct: boolean }[]) => setMastery((m) => {
+    const n = { ...m };
+    rs.forEach((r) => { const v = n[r.topic] || { right: 0, total: 0 }; n[r.topic] = { right: v.right + (r.correct ? 1 : 0), total: v.total + 1 }; });
+    saveMastery(n); return n;
+  });
+  const practiceTopic = (topic: string) => run(`Targeted practice: ${topic}`, `Create a practice problem on this topic: ${topic}`, null, 'practice', thread.length > 0, levelFor(mastery[topic]));
+
+  // Voice tutor: read the answer aloud, then listen for the student's next question.
+  const listen = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    const r = new SR(); r.lang = speechLang(language);
+    r.onresult = (e: any) => handleFollowUp(e.results[0][0].transcript);
+    r.onerror = () => {};
+    r.start();
+  };
+  useEffect(() => {
+    if (!voiceMode || !thread.length) return;
+    speak(thread[thread.length - 1].text, language, listen);
+    return () => stopSpeaking();
+  }, [thread, voiceMode]);
+
   const openHistory = (h: HistoryItem) => { histId.current = h.id; setThread(h.thread); setLastProblem(h.title); setQuiz(null); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const deleteHistory = (id: string) => { const l = history.filter((h) => h.id !== id); setHistory(l); saveHistory(l); };
 
@@ -213,10 +252,17 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <SolutionDisplay thread={thread} isLoading={isLoading} onFollowUp={handleFollowUp} onPractice={handlePractice} onQuiz={handleQuiz} quizLoading={quizLoading} language={language} onVisual={handleVisual} visualLoading={visualLoading} onVerify={handleVerify} verifyLoading={verifyLoading} />
+        <SolutionDisplay thread={thread} isLoading={isLoading} onFollowUp={handleFollowUp} onPractice={handlePractice} onQuiz={handleQuiz} quizLoading={quizLoading} language={language} onVisual={handleVisual} visualLoading={visualLoading} onVerify={handleVerify} verifyLoading={verifyLoading} verifyStatus={verifyRes?.status ?? null} onWhatIf={handleWhatIf} whatIfLoading={whatIfLoading} />
+        {thread.length > 0 && !isLoading && (
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 print:hidden">
+            <button onClick={() => { setVoiceMode((v) => !v); stopSpeaking(); }} className={`px-3 py-1.5 text-xs font-medium rounded-lg border ${voiceMode ? 'border-forge-ember text-forge-ember bg-forge-ember/10' : 'border-forge-border text-forge-muted hover:text-forge-ember'}`}>🎙 Voice tutor: {voiceMode ? 'On' : 'Off'}</button>
+            {voiceMode && <button onClick={() => { stopSpeaking(); listen(); }} className="px-3 py-1.5 text-xs font-medium rounded-lg border border-forge-border text-forge-ink hover:border-forge-ember/60">✋ Interrupt &amp; ask</button>}
+          </div>
+        )}
         {verifyRes && <VerifyBadge r={verifyRes} />}
         {visual && <VisualCard spec={visual} onClose={() => setVisual(null)} />}
-        {quiz && <QuizCard questions={quiz} onClose={() => setQuiz(null)} />}
+        {quiz && <QuizCard questions={quiz} onClose={() => setQuiz(null)} onFinish={handleQuizFinish} />}
+        <ProgressPanel mastery={mastery} onPractice={practiceTopic} />
         <HistoryPanel items={history} solved={solved} onOpen={openHistory} onDelete={deleteHistory} />
 
         <footer className="text-center text-xs text-forge-muted/70 mt-8 pb-4">
