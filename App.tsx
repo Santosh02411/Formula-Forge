@@ -6,9 +6,13 @@ import ImageInput from './components/ImageInput';
 import DrawInput, { DrawInputHandles } from './components/DrawInput';
 import SolutionDisplay from './components/SolutionDisplay';
 import OptionsBar from './components/OptionsBar';
+import QuizCard from './components/QuizCard';
+import HistoryPanel from './components/HistoryPanel';
+import MicButton from './components/MicButton';
+import { loadHistory, saveHistory, loadSolved, saveSolved } from './utils/history';
 import { solveProblem } from './services/geminiService';
 import { InputMode } from './types';
-import type { ImageData, Action, Level, ThreadItem, SolveOptions } from './types';
+import type { ImageData, Action, Level, ThreadItem, SolveOptions, HistoryItem, QuizQuestion } from './types';
 
 const App: React.FC = () => {
   const [activeMode, setActiveMode] = useState<InputMode>(InputMode.TEXT);
@@ -20,6 +24,12 @@ const App: React.FC = () => {
   const [subject, setSubject] = useState('auto');
   const [lastProblem, setLastProblem] = useState('');
   const [isReading, setIsReading] = useState(false);
+  const [language, setLanguage] = useState('English');
+  const [history, setHistory] = useState<HistoryItem[]>(loadHistory);
+  const [solved, setSolved] = useState<number>(loadSolved);
+  const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const histId = useRef('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,8 +47,15 @@ const App: React.FC = () => {
     setIsLoading(true);
     if (!append) setThread([]);
     try {
-      const result = await solveProblem(text, image, { mode, level, subject });
-      setThread((t) => [...(append ? t : []), { label, text: result }]);
+      const result = await solveProblem(text, image, { mode, level, subject, language });
+      const next = [...(append ? thread : []), { label, text: result }];
+      setThread(next);
+      setQuiz(null);
+      if (!append) { histId.current = String(Date.now()); const n = solved + 1; setSolved(n); saveSolved(n); }
+      const old = history.find((h) => h.id === histId.current);
+      const item: HistoryItem = { id: histId.current, ts: Date.now(), title: old?.title ?? (text.trim().slice(0, 80) || '(image problem)'), thread: next };
+      const list = [item, ...history.filter((h) => h.id !== item.id)].slice(0, 15);
+      setHistory(list); saveHistory(list);
     } catch (e: any) {
       setError(e.message || 'An unexpected error occurred.');
     } finally {
@@ -51,7 +68,7 @@ const App: React.FC = () => {
     setError(null);
     setIsReading(true);
     try {
-      const t = (await solveProblem('', image, { mode: 'transcribe', level, subject })).trim();
+      const t = (await solveProblem('', image, { mode: 'transcribe', level, subject, language })).trim();
       setProblemText(t);
       return t;
     } catch (e: any) {
@@ -93,6 +110,22 @@ const App: React.FC = () => {
   const handleFollowUp = (q: string) => run(`You asked: ${q}`, `${context()}\n\nStudent's follow-up question: ${q}`, null, 'followup', true);
   const handlePractice = () => run('Practice problem', context(), null, 'practice', true);
 
+  const handleQuiz = async () => {
+    setQuizLoading(true); setError(null);
+    try {
+      const raw = await solveProblem(context(), null, { mode: 'quiz', level, subject, language });
+      const qs = JSON.parse(raw.replace(/```json|```/g, '').trim()) as QuizQuestion[];
+      if (!Array.isArray(qs) || !qs.length || !qs.every((q) => Array.isArray(q.options) && typeof q.answer === 'number')) throw new Error('bad quiz');
+      setQuiz(qs);
+    } catch {
+      setError('Could not create a quiz this time. Please try again.');
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+  const openHistory = (h: HistoryItem) => { histId.current = h.id; setThread(h.thread); setLastProblem(h.title); setQuiz(null); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const deleteHistory = (id: string) => { const l = history.filter((h) => h.id !== id); setHistory(l); saveHistory(l); };
+
   const renderInputComponent = () => {
     switch (activeMode) {
       case InputMode.IMAGE:
@@ -112,9 +145,10 @@ const App: React.FC = () => {
       <main className="container mx-auto max-w-4xl p-4 md:p-8">
         <div className="animate-fade-up bg-forge-surface/60 p-5 md:p-7 rounded-2xl shadow-2xl border border-forge-border">
           <InputTabs activeMode={activeMode} onModeChange={handleModeChange} />
-          <OptionsBar action={action} setAction={setAction} level={level} setLevel={setLevel} subject={subject} setSubject={setSubject} />
+          <OptionsBar action={action} setAction={setAction} level={level} setLevel={setLevel} subject={subject} setSubject={setSubject} language={language} setLanguage={setLanguage} />
           
           <div className="mt-5">
+            <div className="mb-3 flex justify-center"><MicButton language={language} onText={(t) => setProblemText((p) => (p ? p + ' ' + t : t))} /></div>
             {/* Additional text input for image and draw modes */}
             {(activeMode === InputMode.IMAGE || activeMode === InputMode.DRAW) && (
               <div className="mb-4">
@@ -153,7 +187,9 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <SolutionDisplay thread={thread} isLoading={isLoading} onFollowUp={handleFollowUp} onPractice={handlePractice} />
+        <SolutionDisplay thread={thread} isLoading={isLoading} onFollowUp={handleFollowUp} onPractice={handlePractice} onQuiz={handleQuiz} quizLoading={quizLoading} language={language} />
+        {quiz && <QuizCard questions={quiz} onClose={() => setQuiz(null)} />}
+        <HistoryPanel items={history} solved={solved} onOpen={openHistory} onDelete={deleteHistory} />
 
         <footer className="text-center text-xs text-forge-muted/70 mt-8 pb-4">
           Powered by Google Gemini

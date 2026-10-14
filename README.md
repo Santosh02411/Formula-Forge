@@ -23,3 +23,9 @@ npx vercel dev      # runs the frontend + /api/solve together
 Push to GitHub → Vercel auto-deploys. Set `GEMINI_API_KEY` in Vercel → Project → Settings → Environment Variables.
 
 Built by [Santosh Suresh Madannavar](https://github.com/Santosh02411).
+
+## More features
+- Explain in English, Hindi, Kannada, Tamil, Telugu, Marathi or Bengali
+- Voice: speak your problem 🎤 and have the solution read aloud 🔊 (browser speech APIs)
+- "Quiz me": AI-generated 3-question quiz with instant feedback and score
+- History of recent problems and a solved counter (saved locally in your browser)

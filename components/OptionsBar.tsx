@@ -1,10 +1,12 @@
 import React from 'react';
 import type { Action, Level } from '../types';
+import { LANGUAGES } from '../utils/speech';
 
 interface Props {
   action: Action; setAction: (a: Action) => void;
   level: Level; setLevel: (l: Level) => void;
   subject: string; setSubject: (s: string) => void;
+  language: string; setLanguage: (s: string) => void;
 }
 
 const ACTIONS: { id: Action; label: string; hint: string }[] = [
@@ -15,7 +17,7 @@ const ACTIONS: { id: Action; label: string; hint: string }[] = [
 const SUBJECTS = ['auto', 'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Engineering', 'Logic'];
 const sel = 'bg-forge-void border border-forge-border rounded-lg px-2 py-1.5 text-sm text-forge-ink';
 
-const OptionsBar: React.FC<Props> = ({ action, setAction, level, setLevel, subject, setSubject }) => (
+const OptionsBar: React.FC<Props> = ({ action, setAction, level, setLevel, subject, setSubject, language, setLanguage }) => (
   <div className="mt-5 space-y-3">
     <div className="flex flex-wrap justify-center gap-2" role="radiogroup" aria-label="What do you want?">
       {ACTIONS.map((a) => (
@@ -35,6 +37,11 @@ const OptionsBar: React.FC<Props> = ({ action, setAction, level, setLevel, subje
       <label className="flex items-center gap-2">Subject
         <select className={sel} value={subject} onChange={(e) => setSubject(e.target.value)}>
           {SUBJECTS.map((s) => <option key={s} value={s}>{s === 'auto' ? 'Auto-detect' : s}</option>)}
+        </select>
+      </label>
+      <label className="flex items-center gap-2">Explain in
+        <select className={sel} value={language} onChange={(e) => setLanguage(e.target.value)}>
+          {LANGUAGES.map((l) => <option key={l} value={l}>{l}</option>)}
         </select>
       </label>
     </div>

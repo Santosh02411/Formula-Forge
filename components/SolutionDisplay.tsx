@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { marked } from 'marked';
 import type { ThreadItem } from '../types';
+import { canSpeak, speak, stopSpeaking } from '../utils/speech';
 
 interface Props {
   thread: ThreadItem[];
   isLoading: boolean;
   onFollowUp: (q: string) => void;
   onPractice: () => void;
+  onQuiz: () => void;
+  quizLoading: boolean;
+  language: string;
 }
 
 // marked does not sanitize; strip scripts / event handlers / javascript: URLs from model output.
@@ -30,9 +34,15 @@ const Loader = () => (
 
 const btn = 'px-3 py-1.5 text-xs font-medium rounded-lg border border-forge-border text-forge-muted hover:text-forge-ember hover:border-forge-ember/50 transition-all';
 
-const SolutionDisplay: React.FC<Props> = ({ thread, isLoading, onFollowUp, onPractice }) => {
+const SolutionDisplay: React.FC<Props> = ({ thread, isLoading, onFollowUp, onPractice, onQuiz, quizLoading, language }) => {
   const [q, setQ] = useState('');
   const [copied, setCopied] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const toggleSpeak = () => {
+    if (speaking) { stopSpeaking(); setSpeaking(false); return; }
+    setSpeaking(true);
+    speak(thread[thread.length - 1]?.text ?? '', language, () => setSpeaking(false));
+  };
   const fullText = thread.map((t) => `## ${t.label}\n\n${t.text}`).join('\n\n---\n\n');
 
   const copy = async () => {
@@ -66,6 +76,8 @@ const SolutionDisplay: React.FC<Props> = ({ thread, isLoading, onFollowUp, onPra
         <div className="mt-6 pt-4 border-t border-forge-border space-y-3 print:hidden">
           <div className="flex flex-wrap gap-2">
             <button className={btn} onClick={onPractice}>Practice a similar problem</button>
+            <button className={btn} onClick={onQuiz} disabled={quizLoading}>{quizLoading ? 'Making quiz…' : 'Quiz me'}</button>
+            {canSpeak() && <button className={btn} onClick={toggleSpeak}>{speaking ? '■ Stop' : '🔊 Read aloud'}</button>}
             <button className={btn} onClick={copy}>{copied ? 'Copied ✓' : 'Copy'}</button>
             <button className={btn} onClick={download}>Download .md</button>
             <button className={btn} onClick={() => window.print()}>Print / PDF</button>
