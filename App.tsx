@@ -9,6 +9,9 @@ import OptionsBar from './components/OptionsBar';
 import QuizCard from './components/QuizCard';
 import HistoryPanel from './components/HistoryPanel';
 import MicButton from './components/MicButton';
+import { VisualCard, VerifyBadge } from './components/VisualCard';
+import { verifyClaim } from './utils/mathExpr';
+import type { VerifyResult } from './utils/mathExpr';
 import { loadHistory, saveHistory, loadSolved, saveSolved } from './utils/history';
 import { solveProblem } from './services/geminiService';
 import { InputMode } from './types';
@@ -29,6 +32,10 @@ const App: React.FC = () => {
   const [solved, setSolved] = useState<number>(loadSolved);
   const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
   const [quizLoading, setQuizLoading] = useState(false);
+  const [visual, setVisual] = useState<any>(null);
+  const [visualLoading, setVisualLoading] = useState(false);
+  const [verifyRes, setVerifyRes] = useState<VerifyResult | null>(null);
+  const [verifyLoading, setVerifyLoading] = useState(false);
   const histId = useRef('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +58,7 @@ const App: React.FC = () => {
       const next = [...(append ? thread : []), { label, text: result }];
       setThread(next);
       setQuiz(null);
+      if (!append) { setVisual(null); setVerifyRes(null); }
       if (!append) { histId.current = String(Date.now()); const n = solved + 1; setSolved(n); saveSolved(n); }
       const old = history.find((h) => h.id === histId.current);
       const item: HistoryItem = { id: histId.current, ts: Date.now(), title: old?.title ?? (text.trim().slice(0, 80) || '(image problem)'), thread: next };
@@ -123,6 +131,24 @@ const App: React.FC = () => {
       setQuizLoading(false);
     }
   };
+  const solutionContext = () => `Original problem:\n${lastProblem}\n\nTutor's solution:\n${thread[0]?.text ?? ''}`;
+  const parseJson = (raw: string) => JSON.parse(raw.replace(/```json|```/g, '').trim());
+  const handleVisual = async () => {
+    setVisualLoading(true); setError(null);
+    try {
+      const spec = parseJson(await solveProblem(solutionContext(), null, { mode: 'visual', level, subject, language }));
+      if (spec?.type !== 'plot' && spec?.type !== 'svg') throw new Error('bad');
+      setVisual(spec);
+    } catch { setError('Could not create a visual this time. Please try again.'); }
+    finally { setVisualLoading(false); }
+  };
+  const handleVerify = async () => {
+    setVerifyLoading(true); setError(null);
+    try {
+      setVerifyRes(verifyClaim(parseJson(await solveProblem(solutionContext(), null, { mode: 'verify', level, subject, language }))));
+    } catch { setError('Could not run the verification this time. Please try again.'); }
+    finally { setVerifyLoading(false); }
+  };
   const openHistory = (h: HistoryItem) => { histId.current = h.id; setThread(h.thread); setLastProblem(h.title); setQuiz(null); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const deleteHistory = (id: string) => { const l = history.filter((h) => h.id !== id); setHistory(l); saveHistory(l); };
 
@@ -187,7 +213,9 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <SolutionDisplay thread={thread} isLoading={isLoading} onFollowUp={handleFollowUp} onPractice={handlePractice} onQuiz={handleQuiz} quizLoading={quizLoading} language={language} />
+        <SolutionDisplay thread={thread} isLoading={isLoading} onFollowUp={handleFollowUp} onPractice={handlePractice} onQuiz={handleQuiz} quizLoading={quizLoading} language={language} onVisual={handleVisual} visualLoading={visualLoading} onVerify={handleVerify} verifyLoading={verifyLoading} />
+        {verifyRes && <VerifyBadge r={verifyRes} />}
+        {visual && <VisualCard spec={visual} onClose={() => setVisual(null)} />}
         {quiz && <QuizCard questions={quiz} onClose={() => setQuiz(null)} />}
         <HistoryPanel items={history} solved={solved} onOpen={openHistory} onDelete={deleteHistory} />
 

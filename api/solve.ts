@@ -12,6 +12,8 @@ const MODES: Record<string, string> = {
   practice: `Create ONE new practice problem testing the same concept, with different numbers/context and similar difficulty. Do NOT solve it in the main text. After a --- separator add "**Answer (for self-check):**" with only the final answer.`,
   transcribe: `Transcribe the handwritten or printed problem in the image EXACTLY as written, as plain text. Use ^ for powers, / for fractions, sqrt() for roots, and keep every digit, sign, variable and unit. Do not solve it, explain, or add anything. If part is illegible write [unclear]. Output only the transcription.`,
   quiz: `Create exactly 3 multiple-choice questions (4 options each) that test the key concept from the given problem and tutor reply, with increasing difficulty. Output ONLY a JSON array: [{"q":"question","options":["A","B","C","D"],"answer":0,"why":"one-sentence explanation"}] where answer is the 0-based index of the correct option. Plain text only, no LaTeX.`,
+  visual: `Create a visual explanation of the problem. Output ONLY JSON. For functions, calculus or algebra: {"type":"plot","title":"short","expr":"a*x^2+b","xmin":-5,"xmax":5,"shade":[0,2] or null,"params":[{"name":"a","min":-3,"max":3,"value":1}]}. expr may use only x, parameter names, + - * / ^ ( ), sin cos tan exp ln sqrt abs, pi, e, with explicit * for multiplication; use at most 3 params only for meaningful adjustable constants (omit params if none); shade only for a definite integral. For geometry, physics (forces, circuits, motion), chemistry or anything that is not a function graph: {"type":"svg","title":"short","svg":"<svg viewBox='0 0 600 360' xmlns='http://www.w3.org/2000/svg'>...</svg>"} - a clean labeled diagram showing the given values; no scripts or images; use stroke and fill 'currentColor' for lines and text so it works on dark and light backgrounds; font-size 16 or more.`,
+  verify: `Extract ONE machine-checkable claim for the FINAL ANSWER of the tutor's solution and output ONLY JSON, using plain numbers (decimals, never fractions). Allowed: {"kind":"definite_integral","expr":"3*x^2+4*x+5","a":0,"b":2,"answer":26} | {"kind":"derivative","expr":"x^3","at":2,"answer":12} | {"kind":"roots","expr":"x^2-5*x+6","answers":[2,3]} (expr = left side minus right side) | {"kind":"evaluate","expr":"2*3+4","answer":10} | {"kind":"none","reason":"why"} if the answer is not one of these. expr uses only x, + - * / ^ ( ), sin cos tan exp ln sqrt abs, pi, e, with explicit * for multiplication. Use the ORIGINAL PROBLEM's expression, not the tutor's working, and copy the tutor's stated final answer as the answer.`,
   followup: `Answer the student's follow-up question using the provided context. Be concise and clear, and relate it back to the earlier steps.`,
 };
 
@@ -45,9 +47,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const subjectLine = subject && subject !== 'auto' ? `Subject area: ${subject}.` : '';
   const langLine = language && language !== 'English' ? `Write all explanations in ${language} (keep numbers, formulas, variables and symbols as they are).` : '';
+  const fusion = image ? 'If the image contains circles, arrows, underlines or highlights made by the student, identify exactly what is marked and focus on it. If the student also asks a question (typed or spoken), answer that question specifically and tie the explanation to the visible parts of the diagram or work.' : '';
   const authority = image && text.trim() && (mode === 'solve' || mode === 'hint')
     ? 'The typed text is the student-verified transcription of the problem; trust it over the image wherever they differ, and use the image only for diagrams.' : '';
-  const systemInstruction = mode === 'transcribe' ? MODES.transcribe : mode === 'quiz' ? [MODES.quiz, langLine].filter(Boolean).join('\n\n') : [BASE, MODES[mode] || MODES.solve, LEVELS[level] || LEVELS.standard, subjectLine, langLine, authority].filter(Boolean).join('\n\n');
+  const systemInstruction = ['transcribe', 'quiz', 'visual', 'verify'].includes(mode) ? [MODES[mode], mode === 'quiz' ? langLine : ''].filter(Boolean).join('\n\n') : [BASE, MODES[mode] || MODES.solve, LEVELS[level] || LEVELS.standard, subjectLine, langLine, authority, fusion].filter(Boolean).join('\n\n');
 
   const parts: any[] = [];
   if (image) parts.push({ inlineData: { mimeType: image.mimeType, data: image.base64 } });
@@ -57,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let lastError = 'Unknown error';
   for (const model of MODELS) {
     try {
-      const response = await ai.models.generateContent({ model, contents: { parts }, config: { systemInstruction, ...(mode === 'quiz' ? { responseMimeType: 'application/json' } : {}) } });
+      const response = await ai.models.generateContent({ model, contents: { parts }, config: { systemInstruction, ...(['quiz', 'visual', 'verify'].includes(mode) ? { responseMimeType: 'application/json' } : {}) } });
       if (response.text) return res.status(200).json({ text: response.text });
       lastError = 'The model returned an empty response. Try rephrasing or a clearer image.';
     } catch (e) {

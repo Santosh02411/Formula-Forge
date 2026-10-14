@@ -10,6 +10,10 @@ interface Props {
   onPractice: () => void;
   onQuiz: () => void;
   quizLoading: boolean;
+  onVisual: () => void;
+  visualLoading: boolean;
+  onVerify: () => void;
+  verifyLoading: boolean;
   language: string;
 }
 
@@ -34,7 +38,7 @@ const Loader = () => (
 
 const btn = 'px-3 py-1.5 text-xs font-medium rounded-lg border border-forge-border text-forge-muted hover:text-forge-ember hover:border-forge-ember/50 transition-all';
 
-const SolutionDisplay: React.FC<Props> = ({ thread, isLoading, onFollowUp, onPractice, onQuiz, quizLoading, language }) => {
+const SolutionDisplay: React.FC<Props> = ({ thread, isLoading, onFollowUp, onPractice, onQuiz, quizLoading, language, onVisual, visualLoading, onVerify, verifyLoading }) => {
   const [q, setQ] = useState('');
   const [copied, setCopied] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -77,6 +81,8 @@ const SolutionDisplay: React.FC<Props> = ({ thread, isLoading, onFollowUp, onPra
           <div className="flex flex-wrap gap-2">
             <button className={btn} onClick={onPractice}>Practice a similar problem</button>
             <button className={btn} onClick={onQuiz} disabled={quizLoading}>{quizLoading ? 'Making quiz…' : 'Quiz me'}</button>
+            <button className={btn} onClick={onVisual} disabled={visualLoading}>{visualLoading ? 'Drawing…' : '📈 Visualize'}</button>
+            <button className={btn} onClick={onVerify} disabled={verifyLoading}>{verifyLoading ? 'Checking…' : '✅ Verify answer'}</button>
             {canSpeak() && <button className={btn} onClick={toggleSpeak}>{speaking ? '■ Stop' : '🔊 Read aloud'}</button>}
             <button className={btn} onClick={copy}>{copied ? 'Copied ✓' : 'Copy'}</button>
             <button className={btn} onClick={download}>Download .md</button>

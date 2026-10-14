@@ -13,7 +13,7 @@ export type Action = 'solve' | 'hint' | 'check';
 export type Level = 'beginner' | 'standard' | 'advanced';
 
 export interface SolveOptions {
-  mode: Action | 'practice' | 'followup' | 'transcribe' | 'quiz';
+  mode: Action | 'practice' | 'followup' | 'transcribe' | 'quiz' | 'visual' | 'verify';
   language?: string;
   level: Level;
   subject: string;
