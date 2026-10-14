@@ -1,5 +1,6 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { fileToImageData } from '../utils/image';
 import type { ImageData } from '../types';
 
 interface ImageInputProps {
@@ -17,21 +18,25 @@ const ImageInput: React.FC<ImageInputProps> = ({ setImageData }) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleFile = useCallback((file: File) => {
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = (reader.result as string);
-        setPreview(base64String);
-        setImageData({
-          base64: base64String.split(',')[1],
-          mimeType: file.type,
-        });
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleFile = useCallback(async (file: File) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    try {
+      const { preview, ...data } = await fileToImageData(file);
+      setPreview(preview);
+      setImageData(data);
+    } catch { /* ignore unreadable image */ }
   }, [setImageData]);
-  
+
+  // Paste a screenshot straight from the clipboard (Ctrl+V)
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const f = Array.from(e.clipboardData?.files || []).find((x) => x.type.startsWith('image/'));
+      if (f) handleFile(f);
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [handleFile]);
+
   const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
@@ -102,7 +107,7 @@ const ImageInput: React.FC<ImageInputProps> = ({ setImageData }) => {
               </label>
               <p className="pl-1">or drag and drop</p>
             </div>
-            <p className="text-xs text-forge-muted/70">PNG, JPG, GIF up to 10MB</p>
+            <p className="text-xs text-forge-muted/70">PNG, JPG, WEBP — auto-compressed. You can also paste a screenshot (Ctrl+V).</p>
           </div>
         </div>
       )}

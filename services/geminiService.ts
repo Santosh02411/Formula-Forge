@@ -1,25 +1,18 @@
-import type { ImageData } from '../types';
+import type { ImageData, SolveOptions } from '../types';
 
-export const solveProblem = async (text: string, image?: ImageData | null): Promise<string> => {
+export const solveProblem = async (text: string, image: ImageData | null, opts: SolveOptions): Promise<string> => {
+  let response: Response;
   try {
-    const response = await fetch('/api/solve', {
+    response = await fetch('/api/solve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, image: image ?? null }),
+      body: JSON.stringify({ text, image, ...opts }),
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return `An error occurred while trying to solve the problem: ${data.error || 'Unknown error'}`;
-    }
-
-    return data.text;
-  } catch (error) {
-    console.error('Error calling /api/solve:', error);
-    if (error instanceof Error) {
-      return `An error occurred while trying to solve the problem: ${error.message}`;
-    }
-    return 'An unknown error occurred while trying to solve the problem.';
+  } catch {
+    throw new Error('Network error. Check your connection and try again.');
   }
+  let data: any = {};
+  try { data = await response.json(); } catch { /* non-JSON error page */ }
+  if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
+  return data.text as string;
 };
