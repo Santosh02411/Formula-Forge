@@ -238,3 +238,7 @@ textarea,
 .forge-prose a {
   color: var(--ember);
 }
+
+/* Prevent accidental sideways scrolling on small screens */
+html, body { overflow-x: hidden; }
+img, canvas, svg { max-width: 100%; }

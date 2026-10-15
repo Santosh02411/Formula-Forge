@@ -10,7 +10,7 @@ const PlotView: React.FC<{ spec: any }> = ({ spec }) => {
     const c = ref.current, g = c?.getContext('2d');
     if (!c || !g) return;
     try {
-      const W = 640, H = 360, f = compile(String(spec.expr)), x0 = +spec.xmin, x1 = +spec.xmax, N = 500;
+      const W = 640, H = 360, f = compile(String(spec.expr), ['x', ...(spec.params || []).map((p: any) => p.name)]), x0 = +spec.xmin, x1 = +spec.xmax, N = 500;
       if (!(x1 > x0)) throw new Error('range');
       const xs = Array.from({ length: N + 1 }, (_, k) => x0 + ((x1 - x0) * k) / N), ys = xs.map((x) => f({ ...vals, x }));
       const fin = ys.filter(isFinite).sort((a, b) => a - b);
@@ -46,8 +46,8 @@ const PlotView: React.FC<{ spec: any }> = ({ spec }) => {
       <p className="text-xs text-forge-muted mt-1">Blue dots mark where the curve crosses zero{spec.shade ? '; the shaded area is the integral.' : '.'}</p>
       {(spec.params || []).map((p: any) => (
         <label key={p.name} className="flex items-center gap-3 mt-2 text-sm text-forge-ink">
-          <span className="w-24 font-mono">{p.name} = {+vals[p.name]?.toFixed(2)}</span>
-          <input type="range" min={p.min} max={p.max} step={(p.max - p.min) / 100} value={vals[p.name]} onChange={(e) => setVals((v) => ({ ...v, [p.name]: +e.target.value }))} className="flex-1 accent-forge-ember" />
+          <span className="w-24 shrink-0 font-mono">{p.name} = {+vals[p.name]?.toFixed(2)}</span>
+          <input type="range" min={p.min} max={p.max} step={(p.max - p.min) / 100} value={vals[p.name]} onChange={(e) => setVals((v) => ({ ...v, [p.name]: +e.target.value }))} className="flex-1 min-w-0 accent-forge-ember" />
         </label>
       ))}
     </div>
@@ -79,12 +79,41 @@ export const VisualCard: React.FC<{ spec: any; onClose: () => void }> = ({ spec,
 };
 
 export const VerifyBadge: React.FC<{ r: VerifyResult }> = ({ r }) => {
-  const m = { verified: ['✅ Independently verified', 'border-green-500 bg-green-500/10'], mismatch: ['⚠️ Needs review — the check disagrees', 'border-forge-danger bg-forge-danger/10'], unverifiable: ['ℹ️ Not auto-checkable', 'border-forge-border'] }[r.status];
+  const m = { verified: ['✅ Verified', 'border-green-500 bg-green-500/10'], partial: ['🟡 Partially verified', 'border-yellow-500 bg-yellow-500/10'], mismatch: ['⚠️ Needs review — the check disagrees', 'border-forge-danger bg-forge-danger/10'], unverifiable: ['ℹ️ Not auto-checkable', 'border-forge-border'] }[r.status];
   return (
     <div className={`w-full mt-6 p-4 rounded-2xl border print:hidden ${m[1]}`}>
       <p className="font-display font-semibold text-forge-ink text-sm">{m[0]}</p>
       <p className="text-sm text-forge-muted mt-1">{r.text}</p>
-      <p className="text-xs text-forge-muted mt-1">Checked by a separate numerical calculator in your browser, not by the AI.</p>
+      <p className="text-xs text-forge-muted mt-1">Checked by a separate calculator in your browser, not by the AI. “Verified” is used only when everything claimed was actually checked.</p>
+    </div>
+  );
+};
+
+export const MarkupView: React.FC<{ src: string; steps: any[]; onClose: () => void }> = ({ src, steps, onClose }) => {
+  const col: Record<string, string> = { ok: '#22c55e', error: '#ef4444', unclear: '#eab308' };
+  const ok = (b: any) => Array.isArray(b) && b.length === 4 && b.every((n) => typeof n === 'number' && n >= 0 && n <= 1000) && b[2] > b[0] && b[3] > b[1];
+  return (
+    <div className="w-full mt-6 p-6 bg-forge-surface border border-forge-border rounded-2xl print:hidden">
+      <div className="flex justify-between items-center mb-3">
+        <p className="font-display font-semibold text-forge-ink">Your work, marked</p>
+        <button onClick={onClose} className="text-xs text-forge-muted hover:text-forge-ember">Close</button>
+      </div>
+      <div className="relative inline-block max-w-full">
+        <img src={src} alt="Your work" className="max-w-full rounded-lg border border-forge-border" />
+        {steps.map((s, i) => ok(s.box) && (
+          <div key={i} title={s.note} style={{ position: 'absolute', top: `${s.box[0] / 10}%`, left: `${s.box[1] / 10}%`, height: `${(s.box[2] - s.box[0]) / 10}%`, width: `${(s.box[3] - s.box[1]) / 10}%`, border: `3px solid ${col[s.status] || col.unclear}`, borderRadius: 6, background: `${col[s.status] || col.unclear}22` }}>
+            <span style={{ position: 'absolute', top: -10, left: -10, background: col[s.status] || col.unclear, color: '#fff', fontSize: 11, borderRadius: 9, padding: '0 5px' }}>{i + 1}</span>
+          </div>
+        ))}
+      </div>
+      <ol className="mt-3 space-y-2 text-sm text-forge-ink">
+        {steps.map((s, i) => (
+          <li key={i}><b>{i + 1}. {s.status === 'ok' ? '✓' : s.status === 'error' ? '✗' : '?'}</b> <span className="font-mono">{s.text}</span>
+            {s.note && <span className="text-forge-muted"> — {s.note}</span>}
+            {!ok(s.box) && <span className="text-xs text-forge-muted"> (exact location uncertain, so not boxed)</span>}</li>
+        ))}
+      </ol>
+      <p className="text-xs text-forge-muted mt-2">Box positions are AI estimates and may be slightly off.</p>
     </div>
   );
 };

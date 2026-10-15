@@ -1,116 +1,89 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { fileToImageData } from '../utils/image';
 import type { ImageData } from '../types';
 
-interface ImageInputProps {
-  setImageData: (data: ImageData | null) => void;
-}
+interface ImageInputProps { setImageData: (data: ImageData | null) => void; }
 
-const UploadIcon = () => (
-    <svg className="mx-auto h-10 w-10 text-forge-muted" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-);
-
+const OK_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const MAX_MB = 15;
+const mb = (b: number) => (b / 1048576).toFixed(1);
+const kb = (b: number) => (b >= 1048576 ? `${mb(b)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
 const ImageInput: React.FC<ImageInputProps> = ({ setImageData }) => {
-  const [preview, setPreview] = useState<string | null>(null);
+  const [info, setInfo] = useState<{ preview: string; name: string; size: number; sent: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleFile = useCallback(async (file: File) => {
-    if (!file || !file.type.startsWith('image/')) return;
+  const handleFile = useCallback(async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    if (!OK_TYPES.includes(file.type)) {
+      const heic = /hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
+      setError(heic ? 'HEIC/HEIF photos are not supported. Use a JPG or PNG (iPhone: Settings → Camera → Formats → Most Compatible).' : `“${file.name}” is not a supported image. Please use PNG, JPG, WEBP or GIF.`);
+      return;
+    }
+    if (file.size > MAX_MB * 1048576) { setError(`That image is ${mb(file.size)} MB. Please use one under ${MAX_MB} MB, or crop it to just the problem.`); return; }
+    setBusy(true);
     try {
       const { preview, ...data } = await fileToImageData(file);
-      setPreview(preview);
+      setInfo({ preview, name: file.name && file.name !== 'image.png' ? file.name : 'Pasted screenshot', size: file.size, sent: Math.round(data.base64.length * 0.75) });
       setImageData(data);
-    } catch { /* ignore unreadable image */ }
+    } catch {
+      setError('This image could not be read. It may be corrupted. Try another file or a screenshot.');
+    } finally { setBusy(false); }
   }, [setImageData]);
 
-  // Paste a screenshot straight from the clipboard (Ctrl+V)
   useEffect(() => {
-    const onPaste = (e: ClipboardEvent) => {
-      const f = Array.from(e.clipboardData?.files || []).find((x) => x.type.startsWith('image/'));
-      if (f) handleFile(f);
-    };
+    const onPaste = (e: ClipboardEvent) => { const f = Array.from(e.clipboardData?.files || []).find((x) => x.type.startsWith('image/')); if (f) handleFile(f); };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
   }, [handleFile]);
 
-  const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDragging(false);
-    if (event.dataTransfer.files && event.dataTransfer.files[0]) {
-      handleFile(event.dataTransfer.files[0]);
-    }
-  }, [handleFile]);
-
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-  };
-
-  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDragging(true);
-  };
-  
-  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      handleFile(event.target.files[0]);
-    }
-  };
-  
-  const clearImage = () => {
-    setPreview(null);
-    setImageData(null);
-  };
+  const stop = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); };
+  const remove = () => { setInfo(null); setError(null); setImageData(null); };
+  const pick = (e: React.ChangeEvent<HTMLInputElement>) => { handleFile(e.target.files?.[0]); e.target.value = ''; };
+  const btn = 'px-3 py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-all';
 
   return (
     <div className="w-full">
-      {preview ? (
-        <div className="relative group animate-fade-up">
-          <img src={preview} alt="Problem preview" className="w-full max-h-72 object-contain rounded-xl border border-forge-border bg-forge-void" />
-          <button
-            onClick={clearImage}
-            className="absolute top-2 right-2 p-2 bg-forge-danger text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
-        </div>
-      ) : (
-        <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          className={`flex justify-center px-6 pt-8 pb-8 border-2 border-dashed rounded-xl transition-all duration-200 ${
-            isDragging ? 'border-forge-ember bg-forge-ember/5 scale-[1.01]' : 'border-forge-border hover:border-forge-border-strong'
-          }`}
-        >
-          <div className="space-y-2 text-center">
-            <UploadIcon />
-            <div className="flex text-sm text-forge-muted">
-              <label htmlFor="file-upload" className="relative cursor-pointer font-medium text-forge-ember hover:text-forge-brass focus-within:outline-none px-1 transition-colors">
-                <span>Upload a file</span>
-                <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept="image/*" />
-              </label>
-              <p className="pl-1">or drag and drop</p>
+      {info ? (
+        <div className="animate-fade-up rounded-xl border border-green-500/60 bg-forge-void p-3">
+          <p className="text-xs text-green-500 mb-2">✓ Image ready — it will be sent with your problem</p>
+          <img src={info.preview} alt="Preview of your uploaded problem" className="w-full max-h-64 object-contain rounded-lg border border-forge-border" />
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm text-forge-ink truncate max-w-[16rem]" title={info.name}>{info.name}</p>
+              <p className="text-xs text-forge-muted">{kb(info.size)}{info.sent < info.size ? ` → ${kb(info.sent)} after compression` : ''}</p>
             </div>
-            <p className="text-xs text-forge-muted/70">PNG, JPG, WEBP — auto-compressed. You can also paste a screenshot (Ctrl+V).</p>
+            <div className="flex flex-wrap gap-2">
+              <label className={`${btn} border-forge-border text-forge-ink hover:border-forge-ember/60`}>Replace
+                <input type="file" accept="image/*" className="sr-only" onChange={pick} />
+              </label>
+              <button onClick={remove} className={`${btn} border-forge-danger/60 text-forge-danger hover:bg-forge-danger/10`}>Remove</button>
+            </div>
           </div>
         </div>
+      ) : (
+        <div onDrop={(e) => { stop(e); setIsDragging(false); handleFile(e.dataTransfer.files?.[0]); }} onDragOver={stop} onDragEnter={(e) => { stop(e); setIsDragging(true); }} onDragLeave={(e) => { stop(e); setIsDragging(false); }}
+          className={`px-4 py-8 border-2 border-dashed rounded-xl text-center transition-all duration-200 ${isDragging ? 'border-forge-ember bg-forge-ember/5' : 'border-forge-border hover:border-forge-border-strong'}`}>
+          {busy ? <p className="text-sm text-forge-muted">Reading image…</p> : (
+            <div className="space-y-3">
+              <p className="text-sm text-forge-muted">Drag and drop an image here, or</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <label className={`${btn} border-forge-ember text-forge-ember hover:bg-forge-ember/10`}>Choose a file
+                  <input type="file" accept="image/*" className="sr-only" onChange={pick} />
+                </label>
+                <label className={`${btn} border-forge-border text-forge-ink hover:border-forge-ember/60`}>📷 Take a photo
+                  <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={pick} />
+                </label>
+              </div>
+              <p className="text-xs text-forge-muted/70">PNG, JPG, WEBP or GIF up to {MAX_MB} MB. You can also paste a screenshot (Ctrl+V).</p>
+            </div>
+          )}
+        </div>
       )}
+      {error && <p role="alert" className="mt-2 text-sm text-forge-danger bg-forge-danger/10 border border-forge-danger/30 rounded-lg py-2 px-3">{error}</p>}
     </div>
   );
 };

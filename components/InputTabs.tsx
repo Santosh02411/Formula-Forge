@@ -40,7 +40,7 @@ const InputTabs: React.FC<InputTabsProps> = ({ activeMode, onModeChange }) => {
             <button
               key={mode}
               onClick={() => onModeChange(mode)}
-              className={`flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ease-in-out
+              className={`flex items-center justify-center px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ease-in-out
                 ${isActive
                   ? 'bg-gradient-to-b from-forge-ember to-forge-ember-deep text-white shadow-ember'
                   : 'text-forge-muted hover:bg-forge-surface-2 hover:text-forge-ink'

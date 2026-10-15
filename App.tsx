@@ -9,8 +9,10 @@ import OptionsBar from './components/OptionsBar';
 import QuizCard from './components/QuizCard';
 import HistoryPanel from './components/HistoryPanel';
 import MicButton from './components/MicButton';
-import { VisualCard, VerifyBadge } from './components/VisualCard';
+import Hero from './components/Hero';
+import { VisualCard, VerifyBadge, MarkupView } from './components/VisualCard';
 import { verifyClaim } from './utils/mathExpr';
+import { runWhatIf } from './utils/whatif';
 import ProgressPanel from './components/ProgressPanel';
 import { loadMastery, saveMastery, levelFor } from './utils/mastery';
 import type { Mastery } from './utils/mastery';
@@ -43,6 +45,13 @@ const App: React.FC = () => {
   const [mastery, setMastery] = useState<Mastery>(loadMastery);
   const [voiceMode, setVoiceMode] = useState(false);
   const [whatIfLoading, setWhatIfLoading] = useState(false);
+  const [workImage, setWorkImage] = useState<ImageData | null>(null);
+  const [markup, setMarkup] = useState<any[] | null>(null);
+  const [markLoading, setMarkLoading] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState('');
+  const recRef = useRef<any>(null);
+  const [explore, setExplore] = useState(false);
+  const inputCardRef = useRef<HTMLDivElement>(null);
   const histId = useRef('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +74,7 @@ const App: React.FC = () => {
       const next = [...(append ? thread : []), { label, text: result }];
       setThread(next);
       setQuiz(null);
-      if (!append) { setVisual(null); setVerifyRes(null); }
+      if (!append) { setVisual(null); setVerifyRes(null); setMarkup(null); }
       if (!append) { histId.current = String(Date.now()); const n = solved + 1; setSolved(n); saveSolved(n); }
       const old = history.find((h) => h.id === histId.current);
       const item: HistoryItem = { id: histId.current, ts: Date.now(), title: old?.title ?? (text.trim().slice(0, 80) || '(image problem)'), thread: next };
@@ -118,6 +127,7 @@ const App: React.FC = () => {
       if (!text || text.includes('[unclear]')) return;
     }
     setLastProblem(text.trim() || '(problem is in the image the student provided)');
+    setWorkImage(action === 'check' ? image : null);
     const label = action === 'hint' ? 'Hints' : action === 'check' ? 'Feedback on your work' : 'Solution';
     await run(label, text, image, action);
   };
@@ -161,10 +171,22 @@ const App: React.FC = () => {
     setWhatIfLoading(true); setError(null);
     try {
       const r = parseJson(await solveProblem(`${solutionContext()}\n\nWhat-if question: ${q}`, null, { mode: 'whatif', level, subject, language }));
-      if (r?.plot?.type !== 'plot') throw new Error('bad');
-      setVisual({ ...r.plot, title: `What if: ${q}`.slice(0, 80), note: r.prediction });
+      const calc = runWhatIf(r), title = `What if: ${q}`.slice(0, 80);
+      if (calc) setVisual({ ...calc.plot, title, note: calc.prediction + ' ✔ Calculated independently in your browser from the formula, not by the AI.' });
+      else if (r?.plot?.type === 'plot') setVisual({ ...r.plot, title, note: `${r.prediction || ''} ⚠ AI-generated estimate — not independently calculated.` });
+      else throw new Error('bad');
     } catch { setError('Could not run that what-if this time. Try rephrasing it.'); }
     finally { setWhatIfLoading(false); }
+  };
+  const handleMark = async () => {
+    if (!workImage) return;
+    setMarkLoading(true); setError(null);
+    try {
+      const r = parseJson(await solveProblem('', workImage, { mode: 'markup', level, subject, language }));
+      if (!Array.isArray(r?.steps) || !r.steps.length) throw new Error('bad');
+      setMarkup(r.steps);
+    } catch { setError('Could not mark the work this time. The text feedback above still applies.'); }
+    finally { setMarkLoading(false); }
   };
   const handleQuizFinish = (rs: { topic: string; correct: boolean }[]) => setMastery((m) => {
     const n = { ...m };
@@ -173,23 +195,37 @@ const App: React.FC = () => {
   });
   const practiceTopic = (topic: string) => run(`Targeted practice: ${topic}`, `Create a practice problem on this topic: ${topic}`, null, 'practice', thread.length > 0, levelFor(mastery[topic]));
 
-  // Voice tutor: read the answer aloud, then listen for the student's next question.
+  // Voice tutor: read the answer, then listen for one question; interrupting stops speech first. One recognizer at a time.
+  const stopListening = () => { try { recRef.current?.abort(); } catch { /* already stopped */ } recRef.current = null; };
   const listen = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    const r = new SR(); r.lang = speechLang(language);
-    r.onresult = (e: any) => handleFollowUp(e.results[0][0].transcript);
-    r.onerror = () => {};
-    r.start();
+    if (!SR) { setVoiceStatus('Voice input is not supported in this browser. Use Chrome or Edge.'); return; }
+    stopListening(); stopSpeaking();
+    const r = new SR(); r.lang = speechLang(language); r.interimResults = false;
+    r.onresult = (e: any) => { setVoiceStatus(''); handleFollowUp(e.results[0][0].transcript); };
+    r.onerror = (e: any) => setVoiceStatus(e.error === 'not-allowed' ? 'Microphone permission is blocked. Allow it in the address bar.' : e.error === 'no-speech' ? 'Didn\u2019t catch that. Tap “Interrupt & ask” to try again.' : `Voice error: ${e.error}`);
+    r.onend = () => { if (recRef.current === r) recRef.current = null; };
+    recRef.current = r; setVoiceStatus('🎤 Listening… ask your question');
+    try { r.start(); } catch { setVoiceStatus('Could not start the microphone.'); }
   };
   useEffect(() => {
     if (!voiceMode || !thread.length) return;
+    setVoiceStatus('🔊 Speaking… tap “Interrupt & ask” to cut in');
     speak(thread[thread.length - 1].text, language, listen);
-    return () => stopSpeaking();
+    return () => { stopSpeaking(); stopListening(); };
   }, [thread, voiceMode]);
 
   const openHistory = (h: HistoryItem) => { histId.current = h.id; setThread(h.thread); setLastProblem(h.title); setQuiz(null); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const deleteHistory = (id: string) => { const l = history.filter((h) => h.id !== id); setHistory(l); saveHistory(l); };
+
+  const goToInput = () => inputCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const heroSolve = () => { setAction('solve'); setExplore(false); goToInput(); };
+  const heroAnalyze = () => { setAction('check'); setExplore(false); handleModeChange(InputMode.IMAGE); goToInput(); };
+  const heroExplore = () => { setAction('solve'); setExplore(true); goToInput(); };
+  // Explore Visually: open the visual explanation automatically once the solution arrives.
+  useEffect(() => {
+    if (explore && thread.length === 1 && !isLoading && thread[0].label === 'Solution') { setExplore(false); handleVisual(); }
+  }, [thread]);
 
   const renderInputComponent = () => {
     switch (activeMode) {
@@ -207,8 +243,9 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen">
       <Header />
-      <main className="container mx-auto max-w-4xl p-4 md:p-8">
-        <div className="animate-fade-up bg-forge-surface/60 p-5 md:p-7 rounded-2xl shadow-2xl border border-forge-border">
+      <main className="container mx-auto max-w-4xl p-3 sm:p-4 md:p-8">
+        <Hero onSolve={heroSolve} onAnalyze={heroAnalyze} onExplore={heroExplore} />
+        <div ref={inputCardRef} className="animate-fade-up bg-forge-surface/60 p-3 sm:p-5 md:p-7 scroll-mt-4 rounded-2xl shadow-2xl border border-forge-border">
           <InputTabs activeMode={activeMode} onModeChange={handleModeChange} />
           <OptionsBar action={action} setAction={setAction} level={level} setLevel={setLevel} subject={subject} setSubject={setSubject} language={language} setLanguage={setLanguage} />
           
@@ -232,11 +269,12 @@ const App: React.FC = () => {
             </p>
           )}
 
+          {explore && <p className="mt-4 text-center text-xs text-forge-ember">🔭 Explore mode: a visual explanation opens after your solution. <button onClick={() => setExplore(false)} className="underline">Turn off</button></p>}
           <div className="mt-6 flex justify-center">
             <button
               onClick={handleSolve}
               disabled={isLoading}
-              className="px-8 py-3 bg-gradient-to-b from-forge-ember to-forge-ember-deep text-white font-display font-semibold rounded-xl shadow-ember hover:shadow-ember-lg transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none flex items-center"
+              className="w-full sm:w-auto justify-center px-8 py-3 bg-gradient-to-b from-forge-ember to-forge-ember-deep text-white font-display font-semibold rounded-xl shadow-ember hover:shadow-ember-lg transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none flex items-center"
             >
                 {isLoading ? (
                     <>
@@ -252,14 +290,16 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <SolutionDisplay thread={thread} isLoading={isLoading} onFollowUp={handleFollowUp} onPractice={handlePractice} onQuiz={handleQuiz} quizLoading={quizLoading} language={language} onVisual={handleVisual} visualLoading={visualLoading} onVerify={handleVerify} verifyLoading={verifyLoading} verifyStatus={verifyRes?.status ?? null} onWhatIf={handleWhatIf} whatIfLoading={whatIfLoading} />
+        <SolutionDisplay thread={thread} isLoading={isLoading} onFollowUp={handleFollowUp} onPractice={handlePractice} onQuiz={handleQuiz} quizLoading={quizLoading} language={language} onVisual={handleVisual} visualLoading={visualLoading} onVerify={handleVerify} verifyLoading={verifyLoading} verifyStatus={verifyRes?.status ?? null} onWhatIf={handleWhatIf} whatIfLoading={whatIfLoading} canMark={!!workImage && thread[0]?.label === 'Feedback on your work'} onMark={handleMark} markLoading={markLoading} />
         {thread.length > 0 && !isLoading && (
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2 print:hidden">
-            <button onClick={() => { setVoiceMode((v) => !v); stopSpeaking(); }} className={`px-3 py-1.5 text-xs font-medium rounded-lg border ${voiceMode ? 'border-forge-ember text-forge-ember bg-forge-ember/10' : 'border-forge-border text-forge-muted hover:text-forge-ember'}`}>🎙 Voice tutor: {voiceMode ? 'On' : 'Off'}</button>
+            <button onClick={() => { if (voiceMode) { stopSpeaking(); stopListening(); setVoiceStatus(''); } setVoiceMode((v) => !v); }} className={`px-3 py-1.5 text-xs font-medium rounded-lg border ${voiceMode ? 'border-forge-ember text-forge-ember bg-forge-ember/10' : 'border-forge-border text-forge-muted hover:text-forge-ember'}`}>🎙 Voice tutor: {voiceMode ? 'On' : 'Off'}</button>
             {voiceMode && <button onClick={() => { stopSpeaking(); listen(); }} className="px-3 py-1.5 text-xs font-medium rounded-lg border border-forge-border text-forge-ink hover:border-forge-ember/60">✋ Interrupt &amp; ask</button>}
+            {voiceMode && voiceStatus && <span className="text-xs text-forge-muted">{voiceStatus}</span>}
           </div>
         )}
         {verifyRes && <VerifyBadge r={verifyRes} />}
+        {markup && workImage && <MarkupView src={`data:${workImage.mimeType};base64,${workImage.base64}`} steps={markup} onClose={() => setMarkup(null)} />}
         {visual && <VisualCard spec={visual} onClose={() => setVisual(null)} />}
         {quiz && <QuizCard questions={quiz} onClose={() => setQuiz(null)} onFinish={handleQuizFinish} />}
         <ProgressPanel mastery={mastery} onPractice={practiceTopic} />

@@ -18,7 +18,7 @@ const SUBJECTS = ['auto', 'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Eng
 const sel = 'bg-forge-void border border-forge-border rounded-lg px-2 py-1.5 text-sm text-forge-ink';
 
 const OptionsBar: React.FC<Props> = ({ action, setAction, level, setLevel, subject, setSubject, language, setLanguage }) => (
-  <div className="mt-5 space-y-3">
+  <div className="mt-4 space-y-3">
     <div className="flex flex-wrap justify-center gap-2" role="radiogroup" aria-label="What do you want?">
       {ACTIONS.map((a) => (
         <button key={a.id} role="radio" aria-checked={action === a.id} title={a.hint} onClick={() => setAction(a.id)}

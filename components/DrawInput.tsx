@@ -26,7 +26,7 @@ const DrawInput = forwardRef<DrawInputHandles, Props>(({ onRead, reading }, ref)
 
   return (
     <div className="w-full flex flex-col items-center space-y-3">
-      <div className="w-full h-72 bg-white rounded-xl overflow-hidden border border-forge-border">
+      <div className="w-full h-56 sm:h-72 bg-white rounded-xl overflow-hidden border border-forge-border">
         <canvas ref={canvasRef} onPointerDown={d.onPointerDown} onPointerMove={d.onPointerMove} onPointerUp={d.onPointerUp}
           onPointerCancel={d.onPointerUp} className="block cursor-crosshair"  style={{ touchAction: "none" }} />
       </div>
@@ -43,7 +43,7 @@ const DrawInput = forwardRef<DrawInputHandles, Props>(({ onRead, reading }, ref)
               style={{ backgroundColor: c }} />
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={d.undo} disabled={!d.canUndo} className={tool} title="Undo last stroke (Ctrl+Z)">↶ Undo</button>
           <button onClick={d.clearCanvas} disabled={!d.canUndo} className={tool}>Clear</button>
           {onRead && <button onClick={onRead} disabled={!d.canUndo || reading} className={tool}>{reading ? 'Reading…' : 'Read my drawing'}</button>}

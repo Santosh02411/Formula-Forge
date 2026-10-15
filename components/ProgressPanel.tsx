@@ -3,7 +3,7 @@ import type { Mastery } from '../utils/mastery';
 import { weakest, levelFor } from '../utils/mastery';
 
 const ProgressPanel: React.FC<{ mastery: Mastery; onPractice: (topic: string) => void }> = ({ mastery, onPractice }) => {
-  const topics = Object.entries(mastery).sort((a, b) => a[1].right / a[1].total - b[1].right / b[1].total);
+  const topics = (Object.entries(mastery) as [string, { right: number; total: number }][]).sort((a, b) => a[1].right / a[1].total - b[1].right / b[1].total);
   const weak = weakest(mastery);
   return (
     <details className="w-full mt-4 bg-forge-surface border border-forge-border rounded-2xl print:hidden">
@@ -14,7 +14,7 @@ const ProgressPanel: React.FC<{ mastery: Mastery; onPractice: (topic: string) =>
           const pct = Math.round((v.right / v.total) * 100);
           return (
             <div key={t}>
-              <div className="flex justify-between text-sm text-forge-ink"><span>{t}</span><span className="text-forge-muted">{pct}% · {v.right}/{v.total} · next level: {levelFor(v)}</span></div>
+              <div className="flex flex-wrap justify-between gap-x-3 text-sm text-forge-ink"><span>{t}</span><span className="text-forge-muted">{pct}% · {v.right}/{v.total} · next level: {levelFor(v)}</span></div>
               <div className="h-2 mt-1 rounded bg-forge-border overflow-hidden"><div className={`h-full ${pct < 50 ? 'bg-forge-danger' : 'bg-forge-ember'}`} style={{ width: `${pct}%` }} /></div>
             </div>
           );
