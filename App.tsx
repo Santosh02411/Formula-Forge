@@ -4,7 +4,7 @@ import InputTabs from './components/InputTabs';
 import TextInput from './components/TextInput';
 import ImageInput from './components/ImageInput';
 import DrawInput, { DrawInputHandles } from './components/DrawInput';
-import SolutionDisplay from './components/SolutionDisplay';
+import Workspace from './components/Workspace';
 import OptionsBar from './components/OptionsBar';
 import QuizCard from './components/QuizCard';
 import HistoryPanel from './components/HistoryPanel';
@@ -32,6 +32,8 @@ const App: React.FC = () => {
   const [level, setLevel] = useState<Level>('standard');
   const [subject, setSubject] = useState('auto');
   const [lastProblem, setLastProblem] = useState('');
+  const lastProblemRef = useRef('');
+  const [loadingLabel, setLoadingLabel] = useState('Working…');
   const [isReading, setIsReading] = useState(false);
   const [language, setLanguage] = useState('English');
   const [history, setHistory] = useState<HistoryItem[]>(loadHistory);
@@ -68,6 +70,7 @@ const App: React.FC = () => {
   const run = async (label: string, text: string, image: ImageData | null, mode: SolveOptions['mode'], append = false, lv: Level = level) => {
     setError(null);
     setIsLoading(true);
+    setLoadingLabel(({ solve: 'Solving step by step…', hint: 'Preparing hints…', check: 'Reviewing your work…', practice: 'Creating a practice problem…', followup: 'Answering your question…' } as Record<string, string>)[mode] || 'Working…');
     if (!append) setThread([]);
     try {
       const result = await solveProblem(text, image, { mode, level: lv, subject, language });
@@ -77,7 +80,7 @@ const App: React.FC = () => {
       if (!append) { setVisual(null); setVerifyRes(null); setMarkup(null); }
       if (!append) { histId.current = String(Date.now()); const n = solved + 1; setSolved(n); saveSolved(n); }
       const old = history.find((h) => h.id === histId.current);
-      const item: HistoryItem = { id: histId.current, ts: Date.now(), title: old?.title ?? (text.trim().slice(0, 80) || '(image problem)'), thread: next };
+      const item: HistoryItem = { id: histId.current, ts: Date.now(), title: old?.title ?? (text.trim().slice(0, 80) || '(image problem)'), problem: old?.problem ?? (lastProblemRef.current || text.trim() || '(problem was an image)'), meta: old?.meta ?? { mode: activeMode, action, level: lv, subject, language }, thread: next };
       const list = [item, ...history.filter((h) => h.id !== item.id)].slice(0, 15);
       setHistory(list); saveHistory(list);
     } catch (e: any) {
@@ -109,6 +112,7 @@ const App: React.FC = () => {
     await readDrawing(img);
   };
 
+  const setProblem = (p: string) => { lastProblemRef.current = p; setLastProblem(p); };
   const handleSolve = async () => {
     let image: ImageData | null = null;
     if (activeMode === InputMode.IMAGE) {
@@ -126,7 +130,7 @@ const App: React.FC = () => {
       text = await readDrawing(image);
       if (!text || text.includes('[unclear]')) return;
     }
-    setLastProblem(text.trim() || '(problem is in the image the student provided)');
+    setProblem(text.trim() || '(problem is in the image the student provided)');
     setWorkImage(action === 'check' ? image : null);
     const label = action === 'hint' ? 'Hints' : action === 'check' ? 'Feedback on your work' : 'Solution';
     await run(label, text, image, action);
@@ -215,9 +219,19 @@ const App: React.FC = () => {
     return () => { stopSpeaking(); stopListening(); };
   }, [thread, voiceMode]);
 
-  const openHistory = (h: HistoryItem) => { histId.current = h.id; setThread(h.thread); setLastProblem(h.title); setQuiz(null); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const openHistory = (h: HistoryItem) => {
+    histId.current = h.id; setThread(h.thread);
+    const prob = h.problem ?? h.title; setProblem(prob);
+    const wasImage = prob.startsWith('(');
+    if (!wasImage) { setProblemText(prob); setActiveMode(InputMode.TEXT); }
+    if (h.meta) { setAction(h.meta.action as Action); setLevel(h.meta.level as Level); setSubject(h.meta.subject); setLanguage(h.meta.language); }
+    setQuiz(null); setVisual(null); setVerifyRes(null); setMarkup(null); setWorkImage(null); setError(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const deleteHistory = (id: string) => { const l = history.filter((h) => h.id !== id); setHistory(l); saveHistory(l); };
 
+  const status = isReading ? 'Reading your drawing…' : isLoading ? loadingLabel : visualLoading ? 'Drawing a visual explanation…' : verifyLoading ? 'Verifying the answer with an independent calculator…'
+    : quizLoading ? 'Writing a quiz…' : whatIfLoading ? 'Running your what-if experiment…' : markLoading ? 'Marking your work…' : voiceMode ? voiceStatus : '';
   const goToInput = () => inputCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const heroSolve = () => { setAction('solve'); setExplore(false); goToInput(); };
   const heroAnalyze = () => { setAction('check'); setExplore(false); handleModeChange(InputMode.IMAGE); goToInput(); };
@@ -290,18 +304,16 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <SolutionDisplay thread={thread} isLoading={isLoading} onFollowUp={handleFollowUp} onPractice={handlePractice} onQuiz={handleQuiz} quizLoading={quizLoading} language={language} onVisual={handleVisual} visualLoading={visualLoading} onVerify={handleVerify} verifyLoading={verifyLoading} verifyStatus={verifyRes?.status ?? null} onWhatIf={handleWhatIf} whatIfLoading={whatIfLoading} canMark={!!workImage && thread[0]?.label === 'Feedback on your work'} onMark={handleMark} markLoading={markLoading} />
-        {thread.length > 0 && !isLoading && (
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 print:hidden">
-            <button onClick={() => { if (voiceMode) { stopSpeaking(); stopListening(); setVoiceStatus(''); } setVoiceMode((v) => !v); }} className={`px-3 py-1.5 text-xs font-medium rounded-lg border ${voiceMode ? 'border-forge-ember text-forge-ember bg-forge-ember/10' : 'border-forge-border text-forge-muted hover:text-forge-ember'}`}>🎙 Voice tutor: {voiceMode ? 'On' : 'Off'}</button>
-            {voiceMode && <button onClick={() => { stopSpeaking(); listen(); }} className="px-3 py-1.5 text-xs font-medium rounded-lg border border-forge-border text-forge-ink hover:border-forge-ember/60">✋ Interrupt &amp; ask</button>}
-            {voiceMode && voiceStatus && <span className="text-xs text-forge-muted">{voiceStatus}</span>}
-          </div>
-        )}
-        {verifyRes && <VerifyBadge r={verifyRes} />}
-        {markup && workImage && <MarkupView src={`data:${workImage.mimeType};base64,${workImage.base64}`} steps={markup} onClose={() => setMarkup(null)} />}
-        {visual && <VisualCard spec={visual} onClose={() => setVisual(null)} />}
-        {quiz && <QuizCard questions={quiz} onClose={() => setQuiz(null)} onFinish={handleQuizFinish} />}
+        <Workspace thread={thread} isLoading={isLoading} status={status} language={language} verifyStatus={verifyRes?.status ?? null}
+          onFollowUp={handleFollowUp} onPractice={handlePractice} onQuiz={handleQuiz} onVisual={handleVisual} onVerify={handleVerify} onWhatIf={handleWhatIf} onMark={handleMark}
+          quizLoading={quizLoading} visualLoading={visualLoading} verifyLoading={verifyLoading} whatIfLoading={whatIfLoading} markLoading={markLoading}
+          canMark={!!workImage && thread[0]?.label === 'Feedback on your work'}
+          voiceMode={voiceMode} onVoiceToggle={() => { if (voiceMode) { stopSpeaking(); stopListening(); setVoiceStatus(''); } setVoiceMode((v) => !v); }} onInterrupt={() => { stopSpeaking(); listen(); }}
+          hasVisual={!!visual} hasVerify={!!verifyRes} hasQuiz={!!quiz}
+          visualNode={visual && <VisualCard spec={visual} onClose={() => setVisual(null)} />}
+          verifyNode={verifyRes && <VerifyBadge r={verifyRes} />}
+          quizNode={quiz && <QuizCard questions={quiz} onClose={() => setQuiz(null)} onFinish={handleQuizFinish} />}
+          markNode={markup && workImage && <MarkupView src={`data:${workImage.mimeType};base64,${workImage.base64}`} steps={markup} onClose={() => setMarkup(null)} />} />
         <ProgressPanel mastery={mastery} onPractice={practiceTopic} />
         <HistoryPanel items={history} solved={solved} onOpen={openHistory} onDelete={deleteHistory} />
 

@@ -15,7 +15,7 @@ const HistoryPanel: React.FC<Props> = ({ items, solved, onOpen, onDelete }) => (
           <button onClick={() => onOpen(h)} className="flex-1 text-left truncate px-3 py-2 rounded-lg border border-forge-border text-forge-ink hover:border-forge-ember/60">
             {h.title} <span className="text-xs text-forge-muted">· {new Date(h.ts).toLocaleDateString()}</span>
           </button>
-          <button onClick={() => onDelete(h.id)} aria-label="Delete" className="px-2 text-forge-muted hover:text-forge-danger">✕</button>
+          <button onClick={() => onDelete(h.id)} aria-label={`Delete ${h.title} from history`} className="px-2 text-forge-muted hover:text-forge-danger">✕</button>
         </div>
       ))}
     </div>

@@ -24,5 +24,9 @@ export interface ThreadItem {
   text: string;
 }
 
-export interface HistoryItem { id: string; ts: number; title: string; thread: ThreadItem[]; }
+export interface HistoryItem {
+  id: string; ts: number; title: string; thread: ThreadItem[];
+  problem?: string; // full original problem text (or a placeholder when it was an image)
+  meta?: { mode: string; action: string; level: string; subject: string; language: string };
+}
 export interface QuizQuestion { topic?: string; q: string; options: string[]; answer: number; why: string; }

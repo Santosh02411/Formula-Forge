@@ -43,7 +43,7 @@ const ImageInput: React.FC<ImageInputProps> = ({ setImageData }) => {
   const stop = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); };
   const remove = () => { setInfo(null); setError(null); setImageData(null); };
   const pick = (e: React.ChangeEvent<HTMLInputElement>) => { handleFile(e.target.files?.[0]); e.target.value = ''; };
-  const btn = 'px-3 py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-all';
+  const btn = 'px-3 py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-all focus-within:outline focus-within:outline-2 focus-within:outline-forge-ember';
 
   return (
     <div className="w-full">

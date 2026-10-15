@@ -27,13 +27,13 @@ const DrawInput = forwardRef<DrawInputHandles, Props>(({ onRead, reading }, ref)
   return (
     <div className="w-full flex flex-col items-center space-y-3">
       <div className="w-full h-56 sm:h-72 bg-white rounded-xl overflow-hidden border border-forge-border">
-        <canvas ref={canvasRef} onPointerDown={d.onPointerDown} onPointerMove={d.onPointerMove} onPointerUp={d.onPointerUp}
+        <canvas ref={canvasRef} role="img" aria-label="Drawing area. Draw your problem with a mouse, finger or pen. Keyboard users can type the problem instead." onPointerDown={d.onPointerDown} onPointerMove={d.onPointerMove} onPointerUp={d.onPointerUp}
           onPointerCancel={d.onPointerUp} className="block cursor-crosshair"  style={{ touchAction: "none" }} />
       </div>
       <p className="text-xs text-forge-muted">Tip: write large and clearly, one problem at a time. Use “Read my drawing” to check what the AI sees. (canvas v3)</p>
       <div className="flex flex-wrap items-center justify-between gap-3 w-full p-3 bg-forge-surface-2 rounded-xl border border-forge-border">
         <label className="flex items-center gap-2 text-xs font-medium text-forge-muted">Size
-          <input type="range" min="2" max="14" value={d.lineWidth} onChange={(e) => d.setLineWidth(Number(e.target.value))}
+          <input type="range" aria-label="Pen size" min="2" max="14" value={d.lineWidth} onChange={(e) => d.setLineWidth(Number(e.target.value))}
             className="w-24 h-1.5 bg-forge-border rounded-lg appearance-none cursor-pointer accent-forge-ember" />
         </label>
         <div className="flex items-center gap-2">

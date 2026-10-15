@@ -15,7 +15,7 @@ const MicButton: React.FC<{ onText: (t: string) => void; language: string }> = (
     rec.current = r; setOn(true); r.start();
   };
   return (
-    <button onClick={toggle} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${on ? 'border-forge-ember text-forge-ember bg-forge-ember/10' : 'border-forge-border text-forge-muted hover:text-forge-ember'}`}>
+    <button onClick={toggle} aria-pressed={on} aria-label={on ? 'Stop listening' : 'Speak your problem using the microphone'} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${on ? 'border-forge-ember text-forge-ember bg-forge-ember/10' : 'border-forge-border text-forge-muted hover:text-forge-ember'}`}>
       {on ? '● Listening… (tap to stop)' : '🎤 Speak your problem'}
     </button>
   );
