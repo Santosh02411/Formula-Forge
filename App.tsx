@@ -13,6 +13,7 @@ import Hero from './components/Hero';
 import { VisualCard, VerifyBadge, MarkupView } from './components/VisualCard';
 import { verifyClaim } from './utils/mathExpr';
 import { runWhatIf } from './utils/whatif';
+import { parseModelJson, parseVisual, parseQuiz, parseClaim, parseWhatIf, parseMarkup } from './utils/schemas';
 import ProgressPanel from './components/ProgressPanel';
 import { loadMastery, saveMastery, levelFor } from './utils/mastery';
 import type { Mastery } from './utils/mastery';
@@ -144,8 +145,7 @@ const App: React.FC = () => {
     setQuizLoading(true); setError(null);
     try {
       const raw = await solveProblem(context(), null, { mode: 'quiz', level, subject, language });
-      const qs = JSON.parse(raw.replace(/```json|```/g, '').trim()) as QuizQuestion[];
-      if (!Array.isArray(qs) || !qs.length || !qs.every((q) => Array.isArray(q.options) && typeof q.answer === 'number')) throw new Error('bad quiz');
+      const qs = parseQuiz(parseModelJson(raw));
       setQuiz(qs);
     } catch {
       setError('Could not create a quiz this time. Please try again.');
@@ -154,12 +154,11 @@ const App: React.FC = () => {
     }
   };
   const solutionContext = () => `Original problem:\n${lastProblem}\n\nTutor's solution:\n${thread[0]?.text ?? ''}`;
-  const parseJson = (raw: string) => JSON.parse(raw.replace(/```json|```/g, '').trim());
+  const parseJson = (raw: string) => parseModelJson(raw);
   const handleVisual = async () => {
     setVisualLoading(true); setError(null);
     try {
-      const spec = parseJson(await solveProblem(solutionContext(), null, { mode: 'visual', level, subject, language }));
-      if (spec?.type !== 'plot' && spec?.type !== 'svg') throw new Error('bad');
+      const spec = parseVisual(parseJson(await solveProblem(solutionContext(), null, { mode: 'visual', level, subject, language })));
       setVisual(spec);
     } catch { setError('Could not create a visual this time. Please try again.'); }
     finally { setVisualLoading(false); }
@@ -167,14 +166,14 @@ const App: React.FC = () => {
   const handleVerify = async () => {
     setVerifyLoading(true); setError(null);
     try {
-      setVerifyRes(verifyClaim(parseJson(await solveProblem(solutionContext(), null, { mode: 'verify', level, subject, language }))));
+      setVerifyRes(verifyClaim(parseClaim(parseJson(await solveProblem(solutionContext(), null, { mode: 'verify', level, subject, language })))));
     } catch { setError('Could not run the verification this time. Please try again.'); }
     finally { setVerifyLoading(false); }
   };
   const handleWhatIf = async (q: string) => {
     setWhatIfLoading(true); setError(null);
     try {
-      const r = parseJson(await solveProblem(`${solutionContext()}\n\nWhat-if question: ${q}`, null, { mode: 'whatif', level, subject, language }));
+      const r = parseWhatIf(parseJson(await solveProblem(`${solutionContext()}\n\nWhat-if question: ${q}`, null, { mode: 'whatif', level, subject, language })));
       const calc = runWhatIf(r), title = `What if: ${q}`.slice(0, 80);
       if (calc) setVisual({ ...calc.plot, title, note: calc.prediction + ' ✔ Calculated independently in your browser from the formula, not by the AI.' });
       else if (r?.plot?.type === 'plot') setVisual({ ...r.plot, title, note: `${r.prediction || ''} ⚠ AI-generated estimate — not independently calculated.` });
@@ -186,9 +185,7 @@ const App: React.FC = () => {
     if (!workImage) return;
     setMarkLoading(true); setError(null);
     try {
-      const r = parseJson(await solveProblem('', workImage, { mode: 'markup', level, subject, language }));
-      if (!Array.isArray(r?.steps) || !r.steps.length) throw new Error('bad');
-      setMarkup(r.steps);
+      setMarkup(parseMarkup(parseJson(await solveProblem('', workImage, { mode: 'markup', level, subject, language }))));
     } catch { setError('Could not mark the work this time. The text feedback above still applies.'); }
     finally { setMarkLoading(false); }
   };

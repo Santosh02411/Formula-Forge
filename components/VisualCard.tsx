@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { compile } from '../utils/mathExpr';
+import { sanitizeSvg } from '../utils/sanitize';
 import type { VerifyResult } from '../utils/mathExpr';
 
 const PlotView: React.FC<{ spec: any }> = ({ spec }) => {
@@ -54,17 +55,8 @@ const PlotView: React.FC<{ spec: any }> = ({ spec }) => {
   );
 };
 
-const cleanSvg = (raw: string): string | null => {
-  const doc = new DOMParser().parseFromString(raw, 'image/svg+xml');
-  const svg = doc.documentElement;
-  if (doc.querySelector('parsererror') || svg.nodeName.toLowerCase() !== 'svg') return null;
-  svg.querySelectorAll('script,foreignObject,image,iframe,style').forEach((n) => n.remove());
-  [svg, ...Array.from(svg.querySelectorAll('*'))].forEach((el) => Array.from(el.attributes).forEach((a) => { if (a.name.startsWith('on') || a.name.includes('href')) el.removeAttribute(a.name); }));
-  return svg.outerHTML;
-};
-
 export const VisualCard: React.FC<{ spec: any; onClose: () => void }> = ({ spec, onClose }) => {
-  const svg = spec.type === 'svg' ? cleanSvg(String(spec.svg || '')) : null;
+  const svg = spec.type === 'svg' ? sanitizeSvg(String(spec.svg || '')) : null;
   return (
     <div className="w-full mt-6 p-6 bg-forge-surface border border-forge-border rounded-2xl print:hidden">
       <div className="flex justify-between items-center mb-3">
